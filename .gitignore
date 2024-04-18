@@ -1,0 +1,4 @@
+/drone3
+*.o
+/cmake-build-debug/
+/.idea
