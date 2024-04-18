@@ -6,17 +6,18 @@
 #define CONFIG_ENTRY_H
 
 #include <string>
+#include <utility>
 
 struct ConfigEntry {
     std::string ip;
     ushort port;
     int location;
-    mutable int sendSeq;
-    mutable int recvSeq;
+    mutable int send_sequence;
+    mutable int receive_sequence;
 
 
-    ConfigEntry(const std::string &ip, ushort port, int location, int sendSeq = 0, int recvSeq = 0)
-        : ip(ip), port(port), location(location), sendSeq(sendSeq), recvSeq(recvSeq) {
+    ConfigEntry(std::string ip, ushort port, int location, int send_seq = 0, int receive_seq = 0)
+            : ip(std::move(ip)), port(port), location(location), send_sequence(send_seq), receive_sequence(receive_seq) {
     }
 };
 

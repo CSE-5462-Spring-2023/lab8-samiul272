@@ -10,148 +10,155 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <set>
-#include <math.h>
+#include <cmath>
 #include <memory>
 
-std::unordered_map<std::string, std::string> parseMessage(const std::string &message) {
+std::unordered_map<std::string, std::string> parse_message(const std::string &message) {
     std::unordered_map<std::string, std::string> map;
-    std::set<std::string> seenKeys;
+    std::set<std::string> seen_keys;
     std::string key, value;
-    bool inQuote = false;
-    bool isKey = true;
+    bool in_quote = false;
+    bool is_key = true;
 
-    std::set<std::string> allowedKeys = {
-        "time", "msg", "type", "move", "toPort", "fromPort", "TTL", "version", "flags", "location", "seqNumber", "send-path"
-    };
-    std::set<std::string> requiredKeys = {
-        "time", "toPort", "fromPort", "TTL", "version", "flags", "location", "seqNumber"
+    std::set<std::string> allowed_keys = {
+            "time",
+            "msg",
+            "type",
+            "move",
+            "to_port",
+            "from_port",
+            "ttl",
+            "version",
+            "flags",
+            "location",
+            "sequence_number",
+            "send-path"
+    };\
+    std::set<std::string> required_keys = {
+            "time", "to_port", "from_port", "ttl", "version", "flags", "location", "sequence_number"
     };
 
     for (size_t i = 0; i < message.length(); ++i) {
         if (message[i] == '"' && (i == 0 || message[i - 1] != '\\')) {
-            inQuote = !inQuote;
-        } else if (message[i] == ':' && !inQuote) {
-            isKey = false;
-        }  else if ((message[i] == ' ' && !inQuote && isKey) || (message[i] == ' ' && inQuote)) {
+            in_quote = !in_quote;
+        } else if (message[i] == ':' && !in_quote) {
+            is_key = false;
+        } else if ((message[i] == ' ' && !in_quote && is_key) || (message[i] == ' ' && in_quote)) {
             // Allow spaces within quotes for msg value
             value += message[i]; // Add space to value even outside quotes for key
         }
 
         // Handle end of message or end of value segment
-        if (!inQuote && (message[i] == ' ' || i == message.length() - 1)) {
+        if (!in_quote && (message[i] == ' ' || i == message.length() - 1)) {
             if (i == message.length() - 1 && message[i] != ' ') {
                 value += message[i]; // Ensure last character is included if not space
             }
             if (!key.empty()) {
-                if (seenKeys.find(key) != seenKeys.end()) {
+                if (seen_keys.find(key) != seen_keys.end()) {
                     std::cerr << key << " found more than once" << std::endl;
-                    return std::unordered_map<std::string, std::string>(); // Duplicate key
+                    return {}; // Duplicate key
                 }
-                if (allowedKeys.find(key) == allowedKeys.end()) {
+                if (allowed_keys.find(key) == allowed_keys.end()) {
                     std::cerr << key << " is not in protocol" << std::endl;
-                    return std::unordered_map<std::string, std::string>(); // Unknown key
+                    return {}; // Unknown key
                 }
                 map[key] = value;
-                seenKeys.insert(key);
+                seen_keys.insert(key);
             }
             key.clear();
             value.clear();
-            isKey = true; // Ready to read next key
+            is_key = true; // Ready to read next key
         } else {
             // Accumulate characters into key or value
-            if (isKey) key += message[i];
-            else if (!isKey && (message[i] == ':' && !inQuote)) continue;
+            if (is_key) key += message[i];
+            else if (message[i] == ':' && !in_quote) continue;
             else if (message[i] != 32) value += message[i];
         }
     }
 
     // Check if any required key is missing
-    for (const auto &reqKey: requiredKeys) {
-        if (seenKeys.find(reqKey) == seenKeys.end()) {
-            std::cerr << reqKey << " is missing" << std::endl;
-            return std::unordered_map<std::string, std::string>(); // Missing key
+    for (const auto &required_key: required_keys) {
+        if (seen_keys.find(required_key) == seen_keys.end()) {
+            std::cerr << required_key << " is missing" << std::endl;
+            return {}; // Missing key
         }
     }
-//    if ((seenKeys.find("msg") == seenKeys.end()) && (seenKeys.find("type") == seenKeys.end())) {
-//        std::cout << "Neither msg or type key is present" << std::endl;
-//        return std::unordered_map<std::string, std::string>(); // Missing key
-//    }
 
     return map;
 }
 
 
-std::vector<ConfigEntry> readConfig(const std::string &filePath) {
+std::vector<ConfigEntry> read_config(const std::string &file_path) {
     std::vector<ConfigEntry> config;
-    std::ifstream file(filePath);
+    std::ifstream file(file_path);
     if (!file) {
-        std::cerr << "Could not open file: " << filePath << std::endl;
+        std::cerr << "Could not open file: " << file_path << std::endl;
         return config; // Return the empty vector
     }
     std::string line;
     while (std::getline(file, line)) {
-        // std::cout << "Read line: " << line << std::endl;
         std::istringstream iss(line);
         std::string ip;
         ushort port;
         int location;
         if (iss >> ip >> port >> location) {
-            config.emplace_back(ConfigEntry{ip, port, location, 0, 0});
+            config.emplace_back(ip, port, location, 0, 0);
         }
     }
     return config;
 }
 
-long unsigned int getCurrentUTCTime() {
+long unsigned int get_current_UTC_time() {
     return static_cast<unsigned long>(std::time(nullptr));
 }
 
 
-void sendMessage(const std::string &ip, short port, const std::string &message) {
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
+void send_message(const std::string &ip, ushort port, const std::string &message) {
+    int socket_file_descriptor = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_file_descriptor < 0) {
         std::cerr << "Error opening socket" << std::endl;
         return;
     }
 
-    struct sockaddr_in servaddr;
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port);
-    inet_pton(AF_INET, ip.c_str(), &servaddr.sin_addr);
+    struct sockaddr_in server_address{};
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(port);
+    inet_pton(AF_INET, ip.c_str(), &server_address.sin_addr);
 
-    sendto(sockfd, message.c_str(), message.length(), 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-    close(sockfd);
+    sendto(socket_file_descriptor, message.c_str(), message.length(), 0, (const struct sockaddr *) &server_address, sizeof(server_address));
+    close(socket_file_descriptor);
 }
 
 
-int setupListenSocket(int listenPort) {
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
+int setup_listen_socket(int listen_port) {
+    int socket_file_descriptor = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_file_descriptor < 0) {
         std::cerr << "Error opening socket" << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_in servaddr;
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(listenPort);
+    struct sockaddr_in server_address{};
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_address.sin_port = htons(listen_port);
 
-    if (bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+    if (bind(socket_file_descriptor, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) {
         std::cerr << "Bind failed" << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    return sockfd;
+    return socket_file_descriptor;
 }
 
-void sendMessageToEntry(const ConfigEntry &entry, const BasePacket &packet) {
-    std::string formattedMessage = packet.serialize();
-    sendMessage(entry.ip, entry.port, formattedMessage);
+void send_message_to_entry(const ConfigEntry &entry, const BasePacket &packet) {
+    std::string formatted_message = packet.serialize();
+    send_message(entry.ip, entry.port, formatted_message);
 }
 
-std::pair<std::unique_ptr<Packet>, bool> processIncomingMessage(std::unordered_map<std::basic_string<char>, std::basic_string<char>> map) {
+std::pair<std::unique_ptr<Packet>, bool>
+process_incoming_message(std::unordered_map<std::basic_string<char>, std::basic_string<char>> map) {
     try {
         // Attempt to deserialize as a Message
         Message message = Message::deserialize(map);
@@ -160,7 +167,7 @@ std::pair<std::unique_ptr<Packet>, bool> processIncomingMessage(std::unordered_m
         return std::make_pair(std::unique_ptr<Message>(new Message(std::move(message))), true);
     } catch (const std::exception &e) {
         // Log or handle Message deserialization failure
-        // std::cerr << "Message deserialization failed: " << e.what() << std::endl;
+         std::cerr << "Message deserialization failed: " << e.what() << std::endl;
     }
 
     try {
@@ -170,11 +177,11 @@ std::pair<std::unique_ptr<Packet>, bool> processIncomingMessage(std::unordered_m
         return std::make_pair(std::unique_ptr<Acknowledgement>(new Acknowledgement(std::move(ack))), false);
     } catch (const std::exception &e) {
         // Log or handle Acknowledgement deserialization failure
-        // std::cerr << "Acknowledgement deserialization failed: " << e.what() << std::endl;
+         std::cerr << "Acknowledgement deserialization failed: " << e.what() << std::endl;
     }
     std::cerr << "Deserialization failed: " << std::endl;
 
 
-    // If both deserializations fail, return nullptr with false
+    // If both deserialization operations fail, return nullptr with false
     return std::make_pair(std::unique_ptr<Packet>(nullptr), false);
 }

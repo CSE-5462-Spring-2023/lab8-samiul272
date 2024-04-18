@@ -10,17 +10,17 @@
 
 #include "Message.h"
 
-std::unordered_map<std::string, std::string> parseMessage(const std::string &message);
+std::unordered_map<std::string, std::string> parse_message(const std::string &message);
 
-std::vector<ConfigEntry> readConfig(const std::string &filePath);
+std::vector<ConfigEntry> read_config(const std::string &file_path);
 
-unsigned long getCurrentUTCTime();
+unsigned long get_current_UTC_time();
 
-void sendMessage(const std::string &ip, short port, const std::string &message);
+int setup_listen_socket(int listen_port);
 
-int setupListenSocket(int listenPort);
+void send_message_to_entry(const ConfigEntry &entry, const BasePacket &packet);
 
-void sendMessageToEntry(const ConfigEntry &entry, const BasePacket &packet);
+std::pair<std::unique_ptr<Packet>, bool>
+process_incoming_message(std::unordered_map<std::basic_string<char>, std::basic_string<char>> map);
 
-std::pair<std::unique_ptr<Packet>, bool> processIncomingMessage(std::unordered_map<std::basic_string<char>, std::basic_string<char>> map);
 #endif
