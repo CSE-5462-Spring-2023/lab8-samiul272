@@ -54,8 +54,10 @@ public:
 
     std::string serialize() const override;
 
-    __attribute__((unused)) static Packet *deserialize(const std::string &packet_string); // Adjust implementation accordingly
-    __attribute__((unused)) static Packet deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
+    __attribute__((unused)) static Packet *
+    deserialize(const std::string &packet_string); // Adjust implementation accordingly
+    __attribute__((unused)) static Packet
+    deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
 
 };
 
@@ -117,7 +119,8 @@ public:
     // defined outside the class if it creates a new instance of MoveCommand.
     __attribute__((unused)) static MoveCommand deserialize(const std::string &packetStr);
 
-    __attribute__((unused)) static MoveCommand deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
+    __attribute__((unused)) static MoveCommand
+    deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
 
 };
 

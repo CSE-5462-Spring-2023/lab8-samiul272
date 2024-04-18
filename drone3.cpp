@@ -21,7 +21,6 @@ std::vector<Message> message_store;
 std::mutex message_store_mutex;
 
 
-
 void resend_messages(std::vector<ConfigEntry> &config_entries) {
     std::lock_guard<std::mutex> lock(message_store_mutex);
     for (auto it = message_store.begin(); it != message_store.end();) {
@@ -42,13 +41,15 @@ void resend_messages(std::vector<ConfigEntry> &config_entries) {
     }
 }
 
-void remove_message_if_acked(const Packet& acknowledgement_packet) {
+void remove_message_if_acked(const Packet &acknowledgement_packet) {
     std::lock_guard<std::mutex> lock(message_store_mutex);
-    auto it = std::remove_if(message_store.begin(), message_store.end(), [&acknowledgement_packet](const Packet& stored_packet) {
-        return stored_packet.sequence_number == acknowledgement_packet.sequence_number &&
-               stored_packet.from_port == acknowledgement_packet.to_port && // Note: 'to_port' of ack should match 'from_port' of the message
-               stored_packet.to_port == acknowledgement_packet.from_port;   // and vice versa
-    });
+    auto it = std::remove_if(message_store.begin(), message_store.end(),
+                             [&acknowledgement_packet](const Packet &stored_packet) {
+                                 return stored_packet.sequence_number == acknowledgement_packet.sequence_number &&
+                                        stored_packet.from_port == acknowledgement_packet.to_port &&
+                                        // Note: 'to_port' of ack should match 'from_port' of the message
+                                        stored_packet.to_port == acknowledgement_packet.from_port;   // and vice versa
+                             });
     if (it != message_store.end()) {
         message_store.erase(it, message_store.end());
         std::cout << "ACK received, message removed: Seq #" << acknowledgement_packet.sequence_number << std::endl;
@@ -137,9 +138,10 @@ int main(int argc, char *argv[]) {
 
 
     std::string message_content;
-    auto listener_config = std::find_if(config_entries.begin(), config_entries.end(), [listen_port](const ConfigEntry &e) {
-        return e.port == listen_port;
-    });
+    auto listener_config = std::find_if(config_entries.begin(), config_entries.end(),
+                                        [listen_port](const ConfigEntry &e) {
+                                            return e.port == listen_port;
+                                        });
 
     struct timeval timeout{};
 
@@ -168,7 +170,8 @@ int main(int argc, char *argv[]) {
             socklen_t len = sizeof(client_address);
 
 
-            long n = recvfrom(socket_file_descriptor, buffer, BUFFER_SIZE, 0, reinterpret_cast<struct sockaddr *>(&client_address), &len);
+            long n = recvfrom(socket_file_descriptor, buffer, BUFFER_SIZE, 0,
+                              reinterpret_cast<struct sockaddr *>(&client_address), &len);
             if (n > 0) {
                 buffer[n] = '\0'; // Null-terminate the received data
                 std::string received_message(buffer);
@@ -212,11 +215,12 @@ int main(int argc, char *argv[]) {
                         auto p = packet.from_port;
                         auto sender_config = std::find_if(config_entries.begin(), config_entries.end(),
                                                           [p](const ConfigEntry &e) {
-                                                             return e.port == p;
-                                                         });
+                                                              return e.port == p;
+                                                          });
                         is_duplicate = packet.sequence_number <= sender_config->send_sequence;
                         if (is_duplicate)
-                            std::cout << "Duplicate Message: " << sender_config->send_sequence << ", " << packet.serialize()
+                            std::cout << "Duplicate Message: " << sender_config->send_sequence << ", "
+                                      << packet.serialize()
                                       << std::endl;
                         else sender_config->send_sequence = packet.sequence_number;
                     } else {
@@ -224,8 +228,8 @@ int main(int argc, char *argv[]) {
                         auto p = packet.from_port;
                         auto sender_config = std::find_if(config_entries.begin(), config_entries.end(),
                                                           [p](const ConfigEntry &e) {
-                                                             return e.port == p;
-                                                         });
+                                                              return e.port == p;
+                                                          });
                         is_duplicate = packet.sequence_number <= sender_config->receive_sequence;
                         if (is_duplicate)
                             std::cout << "Duplicate Acknowledgement: " << sender_config->receive_sequence << ", "
@@ -270,8 +274,8 @@ int main(int argc, char *argv[]) {
                 std::cin >> send_to_port;
                 auto send_to_config = std::find_if(config_entries.begin(), config_entries.end(),
                                                    [send_to_port](const ConfigEntry &e) {
-                                                     return e.port == send_to_port;
-                                                 });
+                                                       return e.port == send_to_port;
+                                                   });
                 if (send_to_config != config_entries.end()) {
                     break;
                 }
@@ -310,7 +314,8 @@ int main(int argc, char *argv[]) {
             listener_config->send_sequence += 1;
             for (const auto &entry: config_entries) {
                 if (entry.port != listen_port) {
-                    Message message = Message(get_current_UTC_time(), message_content, send_to_port, listen_port, PROTOCOL_TTL,
+                    Message message = Message(get_current_UTC_time(), message_content, send_to_port, listen_port,
+                                              PROTOCOL_TTL,
                                               PROTOCOL_VERSION, 0, location, listener_config->send_sequence,
                                               std::vector<ushort>{listen_port});
                     send_message_to_entry(entry, message);

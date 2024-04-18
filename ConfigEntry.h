@@ -17,7 +17,8 @@ struct ConfigEntry {
 
 
     ConfigEntry(std::string ip, ushort port, int location, int send_seq = 0, int receive_seq = 0)
-            : ip(std::move(ip)), port(port), location(location), send_sequence(send_seq), receive_sequence(receive_seq) {
+            : ip(std::move(ip)), port(port), location(location), send_sequence(send_seq),
+              receive_sequence(receive_seq) {
     }
 };
 

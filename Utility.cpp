@@ -126,7 +126,8 @@ void send_message(const std::string &ip, ushort port, const std::string &message
     server_address.sin_port = htons(port);
     inet_pton(AF_INET, ip.c_str(), &server_address.sin_addr);
 
-    sendto(socket_file_descriptor, message.c_str(), message.length(), 0, (const struct sockaddr *) &server_address, sizeof(server_address));
+    sendto(socket_file_descriptor, message.c_str(), message.length(), 0, (const struct sockaddr *) &server_address,
+           sizeof(server_address));
     close(socket_file_descriptor);
 }
 
@@ -167,7 +168,7 @@ process_incoming_message(std::unordered_map<std::basic_string<char>, std::basic_
         return std::make_pair(std::unique_ptr<Message>(new Message(std::move(message))), true);
     } catch (const std::exception &e) {
         // Log or handle Message deserialization failure
-         std::cerr << "Message deserialization failed: " << e.what() << std::endl;
+        std::cerr << "Message deserialization failed: " << e.what() << std::endl;
     }
 
     try {
@@ -177,7 +178,7 @@ process_incoming_message(std::unordered_map<std::basic_string<char>, std::basic_
         return std::make_pair(std::unique_ptr<Acknowledgement>(new Acknowledgement(std::move(ack))), false);
     } catch (const std::exception &e) {
         // Log or handle Acknowledgement deserialization failure
-         std::cerr << "Acknowledgement deserialization failed: " << e.what() << std::endl;
+        std::cerr << "Acknowledgement deserialization failed: " << e.what() << std::endl;
     }
     std::cerr << "Deserialization failed: " << std::endl;
 
