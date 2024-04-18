@@ -10,10 +10,9 @@
 #include <netinet/in.h> // For sockaddr_in, socklen_t
 #include <functional>
 #include <mutex>
-#include <set>
 
 #define BUFFER_SIZE 1024
-#define PROTOCOL_VERSION 7
+#define PROTOCOL_VERSION 8
 #define PROTOCOL_TTL 5
 #define ROWS 4
 #define COLS 4
