@@ -33,7 +33,6 @@ public:
 
     virtual std::string serialize() const;
 
-    __attribute__((unused)) static BasePacket *deserialize(__attribute__((unused)) const std::string &packet_string);
 };
 
 class Packet : public BasePacket {
@@ -54,11 +53,6 @@ public:
 
     std::string serialize() const override;
 
-    __attribute__((unused)) static Packet *
-    deserialize(const std::string &packet_string); // Adjust implementation accordingly
-    __attribute__((unused)) static Packet
-    deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
-
 };
 
 class Message : public Packet {
@@ -66,7 +60,7 @@ public:
     std::string msg;
 
     Message(unsigned long time, std::string msg, ushort toPort, ushort from_port, short ttl, short version, short flags,
-            int location, int sequence_number, std::vector<ushort> sendPath);
+            int location, int sequence_number, std::vector<ushort> send_path);
 
     std::unordered_map<std::string, std::string> to_map() const override;
 
@@ -74,7 +68,7 @@ public:
 
     std::string serialize() const override;
 
-    __attribute__((unused)) static Message deserialize(const std::string &message_content);
+    static Message deserialize(const std::string &message_content);
 
     static Message deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
 };
@@ -91,8 +85,6 @@ public:
     void from_map(const std::unordered_map<std::string, std::string> &packet_map) override;
 
     std::string serialize() const override;
-
-    __attribute__((unused)) static Acknowledgement deserialize(const std::string &acknowledgement_string);
 
     static Acknowledgement deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
 
@@ -114,13 +106,6 @@ public:
     void from_map(const std::unordered_map<std::string, std::string> &packet_map) override;
 
     std::string serialize() const override;
-
-    // Assuming deserialize is a static member function, it might need to be
-    // defined outside the class if it creates a new instance of MoveCommand.
-    __attribute__((unused)) static MoveCommand deserialize(const std::string &packetStr);
-
-    __attribute__((unused)) static MoveCommand
-    deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map);
 
 };
 

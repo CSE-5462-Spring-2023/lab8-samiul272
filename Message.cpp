@@ -64,10 +64,6 @@ std::string BasePacket::serialize() const {
     return serializedForm;
 }
 
-__attribute__((unused)) BasePacket *BasePacket::deserialize(__attribute__((unused)) const std::string &packet_string) {
-    return nullptr;
-}
-
 // Packet implementation
 Packet::Packet(unsigned long time, ushort to_port, ushort from_port, short ttl,
                short version, short flags, int location,
@@ -118,20 +114,10 @@ std::string Packet::serialize() const {
     return base_serialized + " send-path:" + send_path_stream.str();
 }
 
-// Placeholder
-__attribute__((unused)) Packet *Packet::deserialize(const std::string &packet_string) {
-    return nullptr;
-}
-
-__attribute__((unused)) Packet
-Packet::deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map) {
-    return {0, 0, 0, 0, 0, 0, 0, 0, std::vector<ushort>()};
-}
-
 // Message implementation
 Message::Message(unsigned long time, std::string msg, ushort to_port, ushort from_port, short ttl, short version,
-                 short flags, int location, int sequence_number, std::vector<ushort> sendPath)
-        : Packet(time, to_port, from_port, ttl, version, flags, location, sequence_number, std::move(sendPath)),
+                 short flags, int location, int sequence_number, std::vector<ushort> send_path)
+        : Packet(time, to_port, from_port, ttl, version, flags, location, sequence_number, std::move(send_path)),
           msg(std::move(msg)) {
 }
 
@@ -152,7 +138,7 @@ std::string Message::serialize() const {
     return oss.str();
 }
 
-__attribute__((unused)) Message Message::deserialize(const std::string &message_content) {
+Message Message::deserialize(const std::string &message_content) {
     const auto map = parse_message(message_content);
     std::vector<ushort> path = {};
     parse_send_path(map.at("send-path"), path);
@@ -217,29 +203,7 @@ std::string Acknowledgement::serialize() const {
     return oss.str();
 }
 
-__attribute__((unused)) Acknowledgement Acknowledgement::deserialize(const std::string &acknowledgement_string) {
-    auto map = parse_message(
-            acknowledgement_string); // You need to implement parse_message based on your serialization format
-    std::vector<ushort> path = {};
-    parse_send_path(map.at("send-path"), path);
-    // Create and return an Acknowledgement object initialized with the extracted values
-    Acknowledgement acknowledgement(
-            std::stoul(map.at("time")),
-            "ACK",
-            static_cast<ushort>(std::stoi(map.at("to_port"))),
-            static_cast<ushort>(std::stoi(map.at("from_port"))),
-            static_cast<short>(std::stoi(map.at("ttl"))),
-            static_cast<short>(std::stoi(map.at("version"))),
-            static_cast<short>(std::stoi(map.at("flags"))),
-            std::stoi(map.at("location")),
-            (std::stoi(map.at("sequence_number"))),
-            path
-    );
-    return acknowledgement;
-}
-
-Acknowledgement
-Acknowledgement::deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map) {
+Acknowledgement Acknowledgement::deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map) {
     std::vector<ushort> path = {};
     parse_send_path(map.at("send-path"), path);
     // Create and return an Acknowledgement object initialized with the extracted values
@@ -282,40 +246,6 @@ std::string MoveCommand::serialize() const {
     oss << BasePacket::serialize() << " "
         << "move:" << move;
     return oss.str();
-}
-
-__attribute__((unused)) MoveCommand MoveCommand::deserialize(const std::string &packetStr) {
-    // Implementation of deserialize that converts a string back into a MoveCommand object.
-    // You need to implement the logic based on your serialization format.
-    // Example parsing logic needed here
-    auto map = parse_message(packetStr); // You need to implement parse_message based on your serialization format
-
-    return {
-            std::stoul(map.at("time")),
-            static_cast<ushort>(std::stoi(map.at("to_port"))),
-            static_cast<ushort>(std::stoi(map.at("from_port"))),
-            static_cast<short>(std::stoi(map.at("ttl"))),
-            static_cast<short>(std::stoi(map.at("version"))),
-            static_cast<short>(std::stoi(map.at("flags"))),
-            std::stoi(map.at("location")),
-            std::stoi(map.at("sequence_number")),
-            std::stoi(map.at("move"))
-    };
-}
-
-__attribute__((unused)) MoveCommand
-MoveCommand::deserialize(std::unordered_map<std::basic_string<char>, std::basic_string<char>> &map) {
-    return {
-            std::stoul(map.at("time")),
-            static_cast<ushort>(std::stoi(map.at("to_port"))),
-            static_cast<ushort>(std::stoi(map.at("from_port"))),
-            static_cast<short>(std::stoi(map.at("ttl"))),
-            static_cast<short>(std::stoi(map.at("version"))),
-            static_cast<short>(std::stoi(map.at("flags"))),
-            std::stoi(map.at("location")),
-            std::stoi(map.at("sequence_number")),
-            std::stoi(map.at("move"))
-    };
 }
 
 
