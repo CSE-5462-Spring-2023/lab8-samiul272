@@ -9,25 +9,50 @@
 #include <unistd.h> // For STDIN_FILENO, close
 #include <netinet/in.h> // For sockaddr_in, socklen_t
 #include <functional>
+#include <mutex>
+#include <set>
 
 #define BUFFER_SIZE 1024
 #define PROTOCOL_VERSION 7
-#define PROTOCOL_TTL 4
+#define PROTOCOL_TTL 5
 #define ROWS 4
 #define COLS 4
 
+std::vector<Message> messageStore;
+std::mutex messageStoreMutex;
 
-void doForEachIf(
-        const std::vector<ConfigEntry> &configEntries,
-        const BasePacket &packet,
-        int listenPort,
-        const std::function<bool(const ConfigEntry &, int listenPort)> &condition,
-        const std::function<void(const ConfigEntry &, const BasePacket &)> &action
-) {
-    for (const auto &entry: configEntries) {
-        if (condition(entry, listenPort)) {
-            action(entry, packet);
+
+
+void resend_messages(std::vector<ConfigEntry>& configEntries) {
+    std::lock_guard<std::mutex> lock(messageStoreMutex);
+    for (auto it = messageStore.begin(); it != messageStore.end(); ) {
+        if (it->TTL <= 0) {
+            it = messageStore.erase(it);
+            std::cout<<"Out of time message erased from queue."<<std::endl;
+        } else {
+            // Assume that sendMessageToEntry is capable of checking the network status or other conditions
+            --(it->TTL);
+            std::cout << it->serialize() << std::endl;
+            for (auto& entry : configEntries) {
+                if (entry.port != it->fromPort) {
+                    sendMessageToEntry(entry, *it);
+                }
+            }
+            ++it;
         }
+    }
+}
+
+void removeMessageIfAcked(const Packet& ackPacket) {
+    std::lock_guard<std::mutex> lock(messageStoreMutex);
+    auto it = std::remove_if(messageStore.begin(), messageStore.end(), [&ackPacket](const Packet& storedPacket) {
+        return storedPacket.seqNumber == ackPacket.seqNumber &&
+               storedPacket.fromPort == ackPacket.toPort && // Note: 'toPort' of ack should match 'fromPort' of the message
+               storedPacket.toPort == ackPacket.fromPort;   // and vice versa
+    });
+    if (it != messageStore.end()) {
+        messageStore.erase(it, messageStore.end());
+        std::cout << "ACK received, message removed: Seq #" << ackPacket.seqNumber << std::endl;
     }
 }
 
@@ -56,8 +81,8 @@ void print_config(std::vector<ConfigEntry> &config, ushort &listenPort) {
     std::cout << "Config:" << std::endl;
     for (const auto &entry: config) {
         if (entry.port == listenPort) {
-            std::cout << entry.port << " " << entry.port << " " << entry.location << " *" << std::endl;
-        } else std::cout << entry.port << " " << entry.port << " " << entry.location << std::endl;
+            std::cout << entry.ip << " " << entry.port << " " << entry.location << " *" << std::endl;
+        } else std::cout << entry.ip << " " << entry.port << " " << entry.location << std::endl;
     }
 }
 
@@ -117,16 +142,27 @@ int main(int argc, char *argv[]) {
         return e.port == listenPort;
     });
 
+    struct timeval timeout;
 
     while (true) {
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
         FD_SET(sockfd, &readfds);
+        timeout.tv_sec = 20;
+        timeout.tv_usec = 0;
+        int rc = select(max_sd + 1, &readfds, nullptr, nullptr, &timeout);
 
-        if (select(max_sd + 1, &readfds, nullptr, nullptr, nullptr) < 0) {
+        if (rc < 0) {
             std::cerr << "Select error." << std::endl;
             break; // Exit the loop in case of select error
         }
+
+        if (rc == 0 && !messageStore.empty()) {
+            resend_messages(configEntries);
+            std::cout << "Timeout! Resending messages.\n";
+            continue;
+        }
+
         if (FD_ISSET(sockfd, &readfds)) {
             char buffer[BUFFER_SIZE];
             sockaddr_in cliaddr{};
@@ -159,6 +195,7 @@ int main(int argc, char *argv[]) {
                     }
                     std::cout << "Moving: " << receivedMessage << std::endl;
                     print_config(configEntries, listenPort);
+                    resend_messages(configEntries);
                     continue;
                 }
                 result = processIncomingMessage(map);
@@ -223,6 +260,9 @@ int main(int argc, char *argv[]) {
                                 }
                             }
                         }
+                    } else {
+                        removeMessageIfAcked(packet);
+                        std::cout<<"Acknowledged message removed from store."<<std::endl;
                     }
                     continue; // Do not do forwarding step
                 }
@@ -233,24 +273,24 @@ int main(int argc, char *argv[]) {
                                                      [p](const ConfigEntry &e) {
                                                          return e.port == p;
                                                      });
-                    if (senderConfig->sendSeq > packet.seqNumber) {
-                        isDuplicate = true;
-                        std::cout << "Duplicate Message during forwarding: " << senderConfig->sendSeq << ", "
-                                  << packet.serialize() << std::endl;
-                        // std::cout << "Duplicate Message during forwarding" << std::endl;
-                    } else senderConfig->sendSeq = packet.seqNumber;
+//                    if (false && senderConfig->sendSeq > packet.seqNumber) {
+//                        isDuplicate = true;
+//                        std::cout << "Duplicate Message during forwarding: " << senderConfig->sendSeq << ", "
+//                                  << packet.serialize() << " curr seq: "<< senderConfig->sendSeq << std::endl;
+//                        // std::cout << "Duplicate Message during forwarding" << std::endl;
+//                    } else senderConfig->sendSeq = packet.seqNumber;
                 } else {
                     auto p = packet.fromPort;
                     auto acknowledgerConfig = std::find_if(configEntries.begin(), configEntries.end(),
                                                            [p](const ConfigEntry &e) {
                                                                return e.port == p;
                                                            });
-                    if (acknowledgerConfig->recvSeq >= packet.seqNumber) {
-                        isDuplicate = true;
-                        std::cout << "Duplicate Acknowledgement during forwarding: " << acknowledgerConfig->recvSeq
-                                  << ", " << packet.serialize() << std::endl;
-                        // std::cout << "Duplicate Acknowledgement during forwarding" << std::endl;
-                    } else acknowledgerConfig->recvSeq = packet.seqNumber;
+//                    if (acknowledgerConfig->recvSeq > packet.seqNumber) {
+//                        isDuplicate = true;
+//                        std::cout << "Duplicate Acknowledgement during forwarding: " << acknowledgerConfig->recvSeq
+//                                  << ", " << packet.serialize() << " curr seq: "<< acknowledgerConfig->recvSeq << std::endl;
+//                        // std::cout << "Duplicate Acknowledgement during forwarding" << std::endl;
+//                    } else acknowledgerConfig->recvSeq = packet.seqNumber;
                 }
                 if (isDuplicate) continue;
                 forward_packet(configEntries, listenPort, location, packet);
@@ -264,7 +304,9 @@ int main(int argc, char *argv[]) {
                                                  [sendtoPort](const ConfigEntry &e) {
                                                      return e.port == sendtoPort;
                                                  });
-                if (sendToConfig != configEntries.end()) break;
+                if (sendToConfig != configEntries.end()) {
+                    break;
+                }
                 std::cout << "Port not in config" << std::endl;
             }
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Clear the input buffer
@@ -303,6 +345,8 @@ int main(int argc, char *argv[]) {
                                               PROTOCOL_VERSION, 0, location, listenerConfig->sendSeq,
                                               std::vector<ushort>{listenPort});
                     sendMessageToEntry(entry, message);
+                    messageStore.push_back(message);
+
                 }
             }
         }
